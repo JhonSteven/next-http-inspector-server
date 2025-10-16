@@ -24,9 +24,52 @@ export function createUIServer(port: number, path: string = '/ui', wsPort: numbe
   }
 
   const server = createServer((req: any, res: any) => {
+    // Handle CORS for all requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
     if (req.url === path) {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(getReactUIHTML(wsPort));
+    } else if (req.url === '/api/logs' && req.method === 'POST') {
+      // Handle HTTP log endpoint
+      let body = '';
+      req.on('data', (chunk: any) => {
+        body += chunk.toString();
+      });
+      
+      req.on('end', () => {
+        try {
+          const logData = JSON.parse(body);
+          console.log('📡 [HTTP_LOG] Received log via HTTP:', logData.type);
+          
+          // Forward the log to WebSocket clients
+          const { getGlobalWsServer, sendWS } = require('./wsServer');
+          const wsServer = getGlobalWsServer();
+          
+          if (wsServer) {
+            sendWS(wsServer, logData);
+            console.log('📤 [HTTP_LOG] Forwarded log to WebSocket clients');
+          } else {
+            console.log('⚠️ [HTTP_LOG] No WebSocket server available to forward log');
+          }
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'Log received and forwarded' }));
+        } catch (error) {
+          console.error('❌ [HTTP_LOG] Error processing log:', error);
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+        }
+      });
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not Found');
@@ -35,6 +78,7 @@ export function createUIServer(port: number, path: string = '/ui', wsPort: numbe
 
   server.listen(port, () => {
     console.log(`🌐 next-instrument UI available at http://localhost:${port}${path}`);
+    console.log(`📡 HTTP log endpoint available at http://localhost:${port}/api/logs`);
   });
 
   return server;
