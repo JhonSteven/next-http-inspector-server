@@ -1,0 +1,42 @@
+{
+  "name": "next-http-inspector-server",
+  "version": "0.1.0",
+  "description": "Standalone HTTP and WebSocket servers for Next.js HTTP Inspector - Install globally to use from any project",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "next-inspector-server": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "start:ui": "node dist/cli.js --ui-only",
+    "start:ws": "node dist/cli.js --ws-only"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "Jhon Parra",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "nextjs",
+    "websocket",
+    "http-server",
+    "inspector",
+    "monitoring",
+    "development",
+    "dev-tools",
+    "global-tool",
+    "cli",
+    "standalone"
+  ]
+}
