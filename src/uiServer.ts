@@ -502,6 +502,7 @@ function getNetworkItemComponent(): string {
 
             ${getJsonValueComponent()}
             ${getRequestDetailsRenderer()}
+            ${getRequestBodyRenderer()}
             ${getResponseBodyRenderer()}
 
             if (request.type === 'fetch_error') {
@@ -584,6 +585,10 @@ function getNetworkItemComponent(): string {
                                 className: \`tab-button \${activeTab === 'details' ? 'active' : ''}\`,
                                 onClick: () => setActiveTab('details')
                             }, 'Details'),
+                            (request.requestBody || request.body) && React.createElement('button', {
+                                className: \`tab-button \${activeTab === 'request' ? 'active' : ''}\`,
+                                onClick: () => setActiveTab('request')
+                            }, 'Request Body'),
                             React.createElement('button', {
                                 className: \`tab-button \${activeTab === 'response' ? 'active' : ''}\`,
                                 onClick: () => setActiveTab('response')
@@ -595,6 +600,11 @@ function getNetworkItemComponent(): string {
                             React.createElement('div', { 
                                 dangerouslySetInnerHTML: { __html: renderRequestDetails(request) } 
                             })
+                        ),
+                        (request.requestBody || request.body) && React.createElement('div', { 
+                            className: \`tab-content \${activeTab === 'request' ? 'active' : ''}\`
+                        },
+                            renderRequestBody(request)
                         ),
                         React.createElement('div', { 
                             className: \`tab-content \${activeTab === 'response' ? 'active' : ''}\`
@@ -766,6 +776,36 @@ function getRequestDetailsRenderer(): string {
                 }
                 
                 return details;
+            };`;
+}
+
+function getRequestBodyRenderer(): string {
+  return `
+            const renderRequestBody = (request) => {
+                if (!request.requestBody && !request.body) {
+                    return React.createElement('div', { className: 'no-data' }, 'No request body');
+                }
+                
+                const body = request.requestBody || request.body;
+                
+                try {
+                    let parsedBody;
+                    if (typeof body === 'string') {
+                        parsedBody = JSON.parse(body);
+                    } else {
+                        parsedBody = body;
+                    }
+                    
+                    return React.createElement('div', { className: 'json-viewer' },
+                        React.createElement(JsonValue, { value: parsedBody })
+                    );
+                } catch (e) {
+                    return React.createElement('div', { className: 'details-content' },
+                        React.createElement('pre', { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }, 
+                            typeof body === 'string' ? body : JSON.stringify(body, null, 2)
+                        )
+                    );
+                }
             };`;
 }
 
