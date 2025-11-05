@@ -4,6 +4,24 @@ import { getStyle } from './ui/styles';
 let createServer: any;
 let Server: any;
 
+// Get version from package.json
+let version = '0.0.0';
+try {
+  const packageJson = require('../package.json');
+  version = packageJson.version || '0.0.0';
+} catch (error) {
+  try {
+    // Fallback: try reading from file system
+    const fs = require('fs');
+    const path = require('path');
+    const packageJsonPath = path.join(__dirname, '../package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    version = packageJson.version || '0.0.0';
+  } catch (fallbackError) {
+    console.warn('⚠️ Could not read version from package.json:', error instanceof Error ? error.message : String(error));
+  }
+}
+
 // Check if we're running in Node.js environment
 const isNodeEnvironment = typeof process !== 'undefined' && process.versions && process.versions.node;
 
@@ -111,14 +129,17 @@ function getReactConstants(): string {
   return `
         const { useState, useEffect, useCallback } = React;
 
+        // App version
+        const APP_VERSION = '${version}';
+
         // Types
         const FilterType = {
-            ALL: 'all',
+            ALL: 'ALL',
             GET: 'GET',
             POST: 'POST',
             PUT: 'PUT',
             DELETE: 'DELETE',
-            ERROR: 'error'
+            ERROR: 'ERROR'
         };`;
 }
 
@@ -134,7 +155,7 @@ function getCustomHooks(): string {
             const [connectionError, setConnectionError] = useState(null);
             const [lastConnectionTime, setLastConnectionTime] = useState(null);
             
-            // Cargar messageCount persistido del localStorage
+            // Load persisted messageCount from localStorage
             const loadPersistedMessageCount = () => {
                 try {
                     const saved = localStorage.getItem('next-telescope-message-count');
@@ -178,7 +199,7 @@ function getCustomHooks(): string {
                         
                         setMessageCount(prev => {
                             const newCount = prev + 1;
-                            // Persistir el contador en localStorage
+                            // Persist the counter in localStorage
                             try {
                                 localStorage.setItem('next-telescope-message-count', newCount.toString());
                                 console.log('💾 [WEBSOCKET] Persisted message count to localStorage:', newCount);
@@ -311,9 +332,9 @@ function getCustomHooks(): string {
                 };
             }, [wsPort]);
 
-            // Efecto adicional para detectar hot reload y reconectar si es necesario
+            // Additional effect to detect hot reload and reconnect if necessary
             useEffect(() => {
-                // Si no estamos conectados después de un tiempo, intentar reconectar
+                // If not connected after a while, attempt to reconnect
                 const timeout = setTimeout(() => {
                     if (!isConnected && !isReconnecting) {
                         console.log('🔄 [WEBSOCKET] Hot reload detected - attempting to reconnect');
@@ -362,7 +383,7 @@ function getHeaderComponent(): string {
   return `
         function Header({ onToggleTheme, onClearAll, theme, onReconnect, connectionError, isConnected, isReconnecting, lastConnectionTime, messageCount, requests }) {
             return React.createElement('div', { className: 'header' },
-                React.createElement('h1', null, '🔭 Next Http Server Inspector'),
+                React.createElement('h1', null, '🔭 Next Http Server Inspector v' + APP_VERSION),
                 React.createElement('div', { className: 'header-controls' },
                     React.createElement('div', { 
                         className: 'connection-status',
@@ -413,7 +434,7 @@ function getHeaderComponent(): string {
 function getToolbarComponent(): string {
   return `
         function Toolbar({ filter, onFilterChange, stats, isConnected, isReconnecting }) {
-            const filters = ['all', 'GET', 'POST', 'PUT', 'DELETE', 'error'];
+            const filters = ['ALL', 'GET', 'POST', 'PUT', 'DELETE', 'ERROR'];
 
             return React.createElement('div', { className: 'toolbar' },
                 React.createElement('div', { className: 'filters' },
@@ -432,7 +453,7 @@ function getToolbarComponent(): string {
                     ),
                     React.createElement('div', { className: 'stat-item' },
                         React.createElement('span', { className: 'stat-number' }, 
-                            stats.total > 0 ? Math.round((stats.successful / stats.total) * 100) : 0
+                            stats.total > 0 ? \`\${stats.successful}/\${stats.total}\` : '0/0'
                         ),
                         React.createElement('span', null, 'success')
                     ),
@@ -1031,7 +1052,7 @@ function getNetworkTableComponent(): string {
 function getMainApp(): string {
   return `
         function App({ wsPort }) {
-            // Cargar datos persistidos del localStorage al inicializar
+            // Load persisted data from localStorage on initialization
             const loadPersistedRequests = () => {
                 try {
                     const saved = localStorage.getItem('next-telescope-requests');
@@ -1048,7 +1069,7 @@ function getMainApp(): string {
             };
 
             const [requests, setRequests] = useState([]);
-            const [filter, setFilter] = useState('all');
+            const [filter, setFilter] = useState('ALL');
             const [expandedItems, setExpandedItems] = useState(new Set());
             const [selectedRequestId, setSelectedRequestId] = useState(null);
             const [showRestoreMessage, setShowRestoreMessage] = useState(false);
@@ -1056,7 +1077,7 @@ function getMainApp(): string {
             
             const { theme, toggleTheme } = useTheme();
             
-            // Cargar datos del localStorage inmediatamente después del mount
+            // Load data from localStorage immediately after mount
             useEffect(() => {
                 console.log('🔄 [UI] Loading data from localStorage on mount');
                 const persistedRequests = loadPersistedRequests();
@@ -1064,26 +1085,26 @@ function getMainApp(): string {
                 
                 if (persistedRequests.length > 0) {
                     setRequests(persistedRequests);
-                    setHasRestoredData(true); // Marcar que se restauraron datos
+                    setHasRestoredData(true); // Mark that data was restored
                     console.log('✅ [UI] Successfully set requests state:', persistedRequests.length);
                 }
-            }, []); // Solo ejecutar una vez después del mount
+            }, []); // Only execute once after mount
             
-            // Mostrar mensaje de restauración solo cuando se restauraron datos del localStorage
+            // Show restore message only when data was restored from localStorage
             useEffect(() => {
                 if (hasRestoredData && requests.length > 0) {
                     console.log('🔄 [UI] Showing restore message for', requests.length, 'restored requests');
                     setShowRestoreMessage(true);
-                    // Ocultar el mensaje después de 5 segundos
+                    // Hide the message after 5 seconds
                     setTimeout(() => setShowRestoreMessage(false), 5000);
-                    // Resetear el flag para que no aparezca de nuevo
+                    // Reset the flag so it doesn't appear again
                     setHasRestoredData(false);
                 }
             }, [hasRestoredData, requests.length]);
 
-            // Efecto de respaldo para sincronizar datos si hay discrepancias
+            // Backup effect to sync data if there are discrepancies
             useEffect(() => {
-                // Solo ejecutar si el estado está vacío pero localStorage tiene datos
+                // Only execute if state is empty but localStorage has data
                 if (requests.length === 0) {
                     const localStorageRequests = (() => {
                         try {
@@ -1097,12 +1118,12 @@ function getMainApp(): string {
                     if (localStorageRequests.length > 0) {
                         console.log('🔄 [UI] Backup sync - state is empty but localStorage has', localStorageRequests.length, 'requests');
                         setRequests(localStorageRequests);
-                        setHasRestoredData(true); // Marcar que se restauraron datos en el backup sync
+                        setHasRestoredData(true); // Mark that data was restored in backup sync
                     }
                 }
             }, [requests.length]);
 
-            // Callback estable para el WebSocket usando useCallback
+            // Stable callback for WebSocket using useCallback
             const handleWebSocketMessage = useCallback((data) => {
                 console.log('🔍 [UI] WebSocket message received:', data);
                 console.log('🔍 [UI] Message type:', data.type);
@@ -1126,7 +1147,7 @@ function getMainApp(): string {
                         const newRequests = [...prev, request];
                         console.log('📊 [UI] New requests count:', newRequests.length);
                         
-                        // Persistir en localStorage
+                        // Persist to localStorage
                         try {
                             localStorage.setItem('next-telescope-requests', JSON.stringify(newRequests));
                             console.log('💾 [UI] Persisted requests to localStorage:', newRequests.length);
@@ -1138,7 +1159,7 @@ function getMainApp(): string {
                 } else {
                     console.log('⚠️ [UI] Unknown message type:', data.type);
                 }
-            }, [setRequests]);
+            }, []);
 
             const { isConnected, isReconnecting, connectionError, manualReconnect, lastConnectionTime, messageCount } = useWebSocket(wsPort, handleWebSocketMessage);
 
@@ -1146,8 +1167,8 @@ function getMainApp(): string {
                 setRequests([]);
                 setExpandedItems(new Set());
                 setSelectedRequestId(null);
-                setHasRestoredData(false); // Resetear el flag de restauración
-                // Limpiar también el localStorage
+                setHasRestoredData(false); // Reset the restoration flag
+                // Also clear localStorage
                 try {
                     localStorage.removeItem('next-telescope-requests');
                     localStorage.removeItem('next-telescope-message-count');
@@ -1182,15 +1203,15 @@ function getMainApp(): string {
             }, []);
 
             const filteredRequests = requests.filter(request => {
-                if (filter === 'error') {
-                    return request.type === 'fetch_error';
-                } else if (filter !== 'all') {
+                if (filter === 'ERROR') {
+                    return request.type === 'fetch_error' || (request.status && request.status >= 400);
+                } else if (filter !== 'ALL') {
                     return request.method === filter;
                 }
                 return true;
             });
 
-            // Debug logging para el estado de la UI (solo cuando cambia)
+            // Debug logging for UI state (only when it changes)
             useEffect(() => {
                 console.log('🔍 [UI] State updated:');
                 console.log('🔍 [UI] - Total requests:', requests.length);
@@ -1199,7 +1220,7 @@ function getMainApp(): string {
                 console.log('🔍 [UI] - Is connected:', isConnected);
                 console.log('🔍 [UI] - Message count:', messageCount);
                 
-                // Exponer funciones de debug en window para inspección manual
+                // Expose debug functions on window for manual inspection
                 window.debugTelescope = {
                     getRequests: () => requests,
                     getFilteredRequests: () => filteredRequests,
@@ -1280,7 +1301,7 @@ function getMainApp(): string {
                         console.log('🔍 [DEBUG] - WebSocket connected:', isConnected);
                         console.log('🔍 [DEBUG] - WebSocket reconnecting:', isReconnecting);
                         
-                        // Intentar cargar datos manualmente
+                        // Attempt to load data manually
                         console.log('🔄 [DEBUG] Attempting manual data load...');
                         const manualLoad = loadPersistedRequests();
                         console.log('🔄 [DEBUG] Manual load result:', manualLoad.length, 'requests');
@@ -1325,7 +1346,7 @@ function getMainApp(): string {
             const stats = {
                 total: requests.length,
                 successful: requests.filter(r => r.type === 'fetch' && r.status >= 200 && r.status < 300).length,
-                errors: requests.filter(r => r.type === 'fetch_error').length,
+                errors: requests.filter(r => r.type === 'fetch_error' || (r.status && r.status >= 400)).length,
                 avgDuration: requests.length > 0 
                     ? Math.round(
                         requests
